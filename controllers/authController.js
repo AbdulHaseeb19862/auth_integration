@@ -299,3 +299,71 @@ export const googleLogin = async (req, res) => {
     });
   }
 };
+
+// FORGOT PASSWORD  CONTROLLER FUNCTIONS
+
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ where: { email } });
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: "Is email se koi account nahi mila" });
+    }
+
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    user.resetToken = resetToken;
+    user.resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minute valid
+    await user.save();
+
+    const resetLink = `${process.env.CLIENT_URL}/reset-password?token=${resetToken}&email=${email}`;
+
+    await sendMail({
+      to: email,
+      subject: "Password Reset Request",
+      html: `<p>Password reset karne ke liye is link par click karein:</p><a href="${resetLink}">${resetLink}</a><p>Ye link 15 minute mein expire ho jayegi.</p>`,
+    });
+
+    res.json({
+      message: "Password reset link aapki email par bhej di gayi hai",
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error", error: error.message });
+  }
+};
+
+// RESET PASSWORD CONTROLLER FUNCTION
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, token, newPassword } = req.body;
+    const user = await User.findOne({ where: { email } });
+
+    if (!user || user.resetToken !== token) {
+      return res.status(400).json({ message: "Token invalid hai" });
+    }
+    if (new Date() > user.resetTokenExpiry) {
+      return res.status(400).json({ message: "Token expire ho chuka hai" });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetToken = null;
+    user.resetTokenExpiry = null;
+    await user.save();
+
+    res.json({
+      message: "Password successfully change ho gaya, ab login karein",
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error", error: error.message });
+  }
+};
+
+// GET USER PROFILE CONTROLLER FUNCTION
+export const getProfile = async (req, res) => {
+  const user = await User.findByPk(req.user.id, {
+    attributes: { exclude: ["password", "otp", "resetToken"] },
+  });
+  res.json({ user });
+};
