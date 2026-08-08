@@ -127,6 +127,7 @@ export const verifyOtp = async (req, res) => {
   }
 };
 
+// RESEND OTP CONTROLLER FUNCTION
 export const resendOtp = async (req, res) => {
   try {
     const { email } = req.body;
@@ -175,6 +176,125 @@ export const resendOtp = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: "Something went wrong.",
+      error: error.message,
+    });
+  }
+};
+
+// LOGIN CONTROLLER FUNCTION
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Find user by email
+    const user = await User.findOne({
+      where: { email },
+    });
+
+    // Check if user exists
+    if (!user || !user.password) {
+      return res.status(400).json({
+        message: "Invalid email or password.",
+      });
+    }
+
+    // Check if account is verified
+    if (!user.isVerified) {
+      return res.status(403).json({
+        message: "Please verify your account using the OTP before logging in.",
+      });
+    }
+
+    // Compare password
+    const isMatch = await bcrypt.compare(password, user.password);
+
+    if (!isMatch) {
+      return res.status(400).json({
+        message: "Invalid email or password.",
+      });
+    }
+
+    // Generate JWT Token
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+    });
+
+    // Success Response
+    return res.status(200).json({
+      message: "Login successful.",
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Something went wrong.",
+      error: error.message,
+    });
+  }
+};
+
+// GOOGLE LOGIN CONTROLLER FUNCTION
+export const googleLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    // Verify Google ID token
+    const ticket = await googleClient.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    // Get user information from Google
+    const payload = ticket.getPayload();
+
+    const { email, name, sub: googleId } = payload;
+
+    // Find user by email
+    let user = await User.findOne({
+      where: { email },
+    });
+
+    // Create a new user if not found
+    if (!user) {
+      user = await User.create({
+        name,
+        email,
+        googleId,
+        isVerified: true,
+      });
+    }
+
+    // Link Google account with existing user
+    else if (!user.googleId) {
+      user.googleId = googleId;
+
+      await user.save();
+    }
+
+    // Generate JWT token
+    const token = generateToken({
+      id: user.id,
+      email: user.email,
+    });
+
+    // Send response
+    return res.status(200).json({
+      message: "Google login successful.",
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Something went wrong during Google login.",
       error: error.message,
     });
   }
