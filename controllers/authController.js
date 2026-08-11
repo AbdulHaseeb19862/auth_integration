@@ -367,3 +367,48 @@ export const getProfile = async (req, res) => {
   });
   res.json({ user });
 };
+
+// LOGOUT CONTROLLER FUNCTION
+export const logout = async (req, res) => {
+  try {
+    res.json({ message: "Logged out successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error", error: error.message });
+  }
+};
+
+// GET ALL USERS CONTROLLER FUNCTION
+export const getAllUsers = async (req, res) => {
+  try {
+    const users = await User.findAll({
+      attributes: { exclude: ["password", "otp", "resetToken"] },
+    });
+
+    res.json({
+      message: "Users fetched successfully",
+      count: users.length,
+      users,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Error", error: error.message });
+  }
+};
+
+// DELETE USER CONTROLLER FUNCTION
+export const deleteUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const user = await User.findByPk(id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    await user.destroy();
+
+    res.json({ message: "User deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Error", error: error.message });
+  }
+};

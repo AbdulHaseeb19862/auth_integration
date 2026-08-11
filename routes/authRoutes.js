@@ -20,4 +20,13 @@ router.post("/reset-password", authController.resetPassword);
 // Protected route
 router.get("/profile", protect, authController.getProfile);
 
+// Logout route
+router.post("/logout", protect, authController.logout);
+
+// Get all users route
+router.get("/users", protect, authController.getAllUsers);
+
+// Delete user route
+router.delete("/users/:id", protect, authController.deleteUser);
+
 export default router;
